@@ -27,6 +27,7 @@ pub enum ParsingState {
     CapturingTag,
     CapturingText,
     DeterminingTokenType,
+    CapturingRawText,
 }
 
 #[derive(Clone, Debug)]
@@ -207,11 +208,25 @@ pub fn get_tokens(html: &str) -> TokenStream {
             ParsingState::CapturingTag => {
                 if char == '>' {
                     app_state.current_token.token_value.push(char);
-                    app_state.current_token.set_tag_and_properties();
-                    app_state.token_stream.push(app_state.current_token.clone());
+                    if app_state
+                        .current_token
+                        .token_value
+                        .to_lowercase()
+                        .starts_with("<script")
+                        || app_state
+                            .current_token
+                            .token_value
+                            .to_lowercase()
+                            .starts_with("<style")
+                    {
+                        app_state.parsing_state = ParsingState::CapturingRawText;
+                    } else {
+                        app_state.parsing_state = ParsingState::DeterminingTokenType;
+                        app_state.current_token.set_tag_and_properties();
+                        app_state.token_stream.push(app_state.current_token.clone());
+                    }
                     app_state.current_token.token_value.clear();
                     app_state.current_token.token_type = TokenType::Unknown;
-                    app_state.parsing_state = ParsingState::DeterminingTokenType;
                 } else {
                     app_state.current_token.token_value.push(char);
                 }
@@ -223,6 +238,26 @@ pub fn get_tokens(html: &str) -> TokenStream {
                     }
                     app_state.current_token.token_value = String::from("<");
                     app_state.capturing_tag_transition(&mut chars);
+                } else {
+                    app_state.current_token.token_value.push(char);
+                }
+            }
+            ParsingState::CapturingRawText => {
+                // For now we will just throw away style or script tags
+                if app_state
+                    .current_token
+                    .token_value
+                    .to_lowercase()
+                    .ends_with("</script")
+                    || app_state
+                        .current_token
+                        .token_value
+                        .to_lowercase()
+                        .ends_with("</style")
+                {
+                    app_state.parsing_state = ParsingState::DeterminingTokenType;
+                    app_state.current_token.token_value.clear();
+                    app_state.current_token.token_type = TokenType::Unknown;
                 } else {
                     app_state.current_token.token_value.push(char);
                 }
@@ -243,6 +278,14 @@ mod tests {
     <html>
     <head>
     <title>A</title>
+    <script type="text/javascript">
+        console.log("Hello World!");
+    </script>
+    <style type="text/css">
+        body {
+            background-color: #f0f0f0;
+        }
+    </style>
     </head>
     <body>
     <img src="random.jpg" height="400" width="300" />
