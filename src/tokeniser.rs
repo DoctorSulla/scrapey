@@ -71,6 +71,22 @@ impl AppState {
 }
 
 impl Token {
+    pub fn get_token_type(&self) -> TokenType {
+        self.token_type.clone()
+    }
+
+    pub fn get_html_element(&self) -> Option<HtmlElement> {
+        self.token_element.clone()
+    }
+
+    pub fn get_text(&self) -> String {
+        self.token_value.clone()
+    }
+
+    pub fn get_properties(&self) -> HashMap<String, String> {
+        self.properties.clone()
+    }
+
     fn set_tag_and_properties(&mut self) {
         let mut tag_content = self.token_value[1..&self.token_value.len() - 1].trim();
         if tag_content.ends_with('/') {

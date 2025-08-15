@@ -1,9 +1,92 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    rc::{Rc, Weak},
+};
 
+use crate::{
+    html_elements::HtmlElement,
+    tokeniser::{TokenStream, TokenType},
+};
+
+type NodeRef = Rc<RefCell<Node>>;
+
+#[derive(Clone, Debug)]
+pub enum NodeType {
+    Document,
+    Element(HtmlElement),
+    Text(String),
+    Comment(String),
+}
+
+#[derive(Clone, Debug)]
 pub struct Node {
-    parent_element: Option<Rc<RefCell<Node>>>,
-    children: Vec<Rc<RefCell<Node>>>,
+    node_type: NodeType,
+    parent_element: Option<Weak<RefCell<Node>>>,
+    children: Vec<NodeRef>,
     properties: HashMap<String, String>,
 }
 
-// TODO
+impl Node {
+    pub fn from_token_stream(token_stream: TokenStream) {
+        let root = Rc::new(RefCell::new(Node {
+            node_type: NodeType::Document,
+            parent_element: None,
+            children: vec![],
+            properties: HashMap::new(),
+        }));
+
+        let mut open_tags: Vec<NodeRef> = vec![];
+
+        for token in token_stream.into_iter() {
+            let parent_element = open_tags.last().unwrap_or(&root);
+            match token.get_token_type() {
+                TokenType::OpeningTag => {
+                    let new_node = Rc::new(RefCell::new(Node {
+                        node_type: NodeType::Element(token.get_html_element().unwrap()),
+                        parent_element: Some(Rc::downgrade(&parent_element)),
+                        children: vec![],
+                        properties: token.get_properties(),
+                    }));
+                    parent_element.borrow_mut().children.push(new_node.clone());
+                }
+                TokenType::ClosingTag => {
+                    open_tags.pop();
+                }
+                TokenType::VoidTag => {
+                    let new_node = Rc::new(RefCell::new(Node {
+                        node_type: NodeType::Element(token.get_html_element().unwrap()),
+                        parent_element: Some(Rc::downgrade(&parent_element)),
+                        children: vec![],
+                        properties: HashMap::new(),
+                    }));
+                    parent_element.borrow_mut().children.push(new_node.clone());
+                }
+                TokenType::Text => {
+                    let new_node = Rc::new(RefCell::new(Node {
+                        node_type: NodeType::Text(token.get_text()),
+                        parent_element: Some(Rc::downgrade(&parent_element)),
+                        children: vec![],
+                        properties: HashMap::new(),
+                    }));
+                    parent_element.borrow_mut().children.push(new_node.clone());
+                }
+                TokenType::Comment => {
+                    let new_node = Rc::new(RefCell::new(Node {
+                        node_type: NodeType::Comment(token.get_text()),
+                        parent_element: Some(Rc::downgrade(&parent_element)),
+                        children: vec![],
+                        properties: token.get_properties(),
+                    }));
+                    parent_element.borrow_mut().children.push(new_node.clone());
+                }
+                TokenType::Unknown => {} // TODO
+            }
+        }
+    }
+}
+
+mod tests {
+    //use super::*;
+    // TODO
+}
