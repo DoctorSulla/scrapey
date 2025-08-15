@@ -28,7 +28,20 @@ pub struct Node {
 }
 
 impl Node {
-    pub fn from_token_stream(token_stream: TokenStream) {
+    pub fn walk_tree(&self) {
+        match &self.node_type {
+            NodeType::Document => println!("Document"),
+            NodeType::Element(element) => println!("Element: {:?}", element),
+            NodeType::Text(text) => println!("Text: {}", text),
+            NodeType::Comment(comment) => println!("Comment: {}", comment),
+        }
+
+        for child in &self.children {
+            child.borrow().walk_tree();
+        }
+    }
+
+    pub fn from_token_stream(token_stream: TokenStream) -> NodeRef {
         let root = Rc::new(RefCell::new(Node {
             node_type: NodeType::Document,
             parent_element: None,
@@ -83,10 +96,21 @@ impl Node {
                 TokenType::Unknown => {} // TODO
             }
         }
+        root
     }
 }
 
 mod tests {
-    //use super::*;
-    // TODO
+    use super::*;
+    use crate::tokeniser::get_tokens;
+
+    const TEST: &str =
+        "<html><head><title>Test</title></head><body><p>Hello, world!</p></body></html>";
+
+    #[test]
+    fn try_walk_tree() {
+        let tokens = get_tokens(TEST);
+        let document = Node::from_token_stream(tokens);
+        document.borrow().walk_tree();
+    }
 }
