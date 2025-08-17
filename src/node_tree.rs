@@ -41,15 +41,40 @@ impl Node {
         }
     }
 
-    // pub fn get_elements_by_class(&self, class: &str, elements: &mut Vec<Node>) {
-    //     if let NodeType:Element(_element) = &self.node_type {
-    //     }
-    // }
+    pub fn get_elements_by_class(&self, class: &str) -> Vec<Node> {
+        let mut elements = Vec::new();
+        if let NodeType::Element(_element) = &self.node_type {
+            if self.get_class_list().contains(&class.to_string()) {
+                elements.push(self.clone());
+            }
+            for child in &self.children {
+                elements.extend(child.borrow().get_elements_by_class(class));
+            }
+        }
+        elements
+    }
+
+    pub fn get_elements_by_tag(&self, tag: &HtmlElement) -> Vec<Node> {
+        let mut elements = Vec::new();
+        if let NodeType::Element(element) = &self.node_type {
+            if element == tag {
+                elements.push(self.clone());
+            }
+        }
+        for child in &self.children {
+            elements.extend(child.borrow().get_elements_by_tag(tag));
+        }
+
+        elements
+    }
 
     pub fn get_class_list(&self) -> Vec<String> {
         let mut classes = vec![];
         if let Some(class_list) = self.properties.get("class") {
-            classes = class_list.split(' ').map(|v| v.to_string()).collect();
+            classes = class_list
+                .split_whitespace()
+                .map(|v| v.to_string())
+                .collect();
         }
         classes
     }
