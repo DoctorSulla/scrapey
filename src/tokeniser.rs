@@ -226,6 +226,7 @@ pub fn get_tokens(html: &str) -> TokenStream {
                         app_state.token_stream.push(app_state.current_token.clone());
                     }
                     app_state.current_token.token_value.clear();
+                    app_state.current_token.properties.clear();
                     app_state.current_token.token_type = TokenType::Unknown;
                 } else {
                     app_state.current_token.token_value.push(char);
