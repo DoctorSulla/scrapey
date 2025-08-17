@@ -47,9 +47,10 @@ impl Node {
             if self.get_class_list().contains(&class.to_string()) {
                 elements.push(self.clone());
             }
-            for child in &self.children {
-                elements.extend(child.borrow().get_elements_by_class(class));
-            }
+        }
+
+        for child in &self.children {
+            elements.extend(child.borrow().get_elements_by_class(class));
         }
         elements
     }
@@ -76,6 +77,7 @@ impl Node {
                 .map(|v| v.to_string())
                 .collect();
         }
+
         classes
     }
 
@@ -94,6 +96,13 @@ impl Node {
 
         None
     }
+
+    // pub fn get_parent(&self) -> Option<Node> {
+    //     match self.parent_element {
+    //         Some(parent) => Some(parent.upgrade().unwrap().clone()),
+    //         None => None,
+    //     }
+    // }
 
     pub fn from_token_stream(token_stream: TokenStream) -> NodeRef {
         let root = Rc::new(RefCell::new(Node {
@@ -161,7 +170,8 @@ mod tests {
     use crate::tokeniser::get_tokens;
 
     #[cfg(test)]
-    const TEST: &str = r##"<html><head><title>Test</title></head><body><p id="some-paragraph">Hello, world!</p><div id='classy' class='bg-red p-10 primary'>This is a div with a few classes</div></body></html>"##;
+    const TEST: &str = r##"<html><head><title>Test</title></head><body><p id="some-paragraph">Hello, world!</p><div id='classy' class='bg-red p-10 primary'>This is a div with a few classes</div>
+    <div class='bg-red'>This is another div with the same class</div></body></html>"##;
 
     #[test]
     fn try_walk_tree() {
@@ -200,5 +210,23 @@ mod tests {
                 "primary".to_string()
             ]
         );
+    }
+
+    #[test]
+    fn check_get_elements_by_class() {
+        let tokens = get_tokens(TEST);
+        let document = Node::from_token_stream(tokens);
+        let elements = document.borrow().get_elements_by_class("bg-red");
+
+        assert_eq!(elements.len(), 2);
+    }
+
+    #[test]
+    fn check_get_elements_by_tag() {
+        let tokens = get_tokens(TEST);
+        let document = Node::from_token_stream(tokens);
+        let elements = document.borrow().get_elements_by_tag(&HtmlElement::Div);
+
+        assert_eq!(elements.len(), 2);
     }
 }
