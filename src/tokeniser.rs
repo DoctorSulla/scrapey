@@ -71,6 +71,12 @@ impl AppState {
     }
 }
 
+impl Default for AppState {
+    fn default() -> Self {
+        AppState::new()
+    }
+}
+
 impl Token {
     pub fn get_token_type(&self) -> TokenType {
         self.token_type.clone()
@@ -120,9 +126,8 @@ fn parse_properties(properties: &str) -> HashMap<String, String> {
     let mut value_buffer = String::new();
     let mut state = AttrState::CapturingKey;
 
-    let mut chars = properties.chars().peekable();
-
-    while let Some(char) = chars.next() {
+    //let mut chars = properties.chars().peekable();
+    for char in properties.chars() {
         match state {
             AttrState::CapturingKey => {
                 if char == '=' {

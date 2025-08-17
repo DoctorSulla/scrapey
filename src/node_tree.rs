@@ -11,7 +11,7 @@ use crate::{
 
 type NodeRef = Rc<RefCell<Node>>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum NodeType {
     Document,
     Element(HtmlElement),
@@ -41,6 +41,35 @@ impl Node {
         }
     }
 
+    // pub fn get_elements_by_class(&self, class: &str, elements: &mut Vec<Node>) {
+    //     if let NodeType:Element(_element) = &self.node_type {
+    //     }
+    // }
+
+    pub fn get_class_list(&self) -> Vec<String> {
+        let mut classes = vec![];
+        if let Some(class_list) = self.properties.get("class") {
+            classes = class_list.split(' ').map(|v| v.to_string()).collect();
+        }
+        classes
+    }
+
+    pub fn get_element_by_id(&self, id: &str) -> Option<Node> {
+        if let NodeType::Element(_element) = &self.node_type
+            && self.properties.get("id") == Some(&id.to_string())
+        {
+            return Some(self.clone());
+        }
+
+        for child in &self.children {
+            if let Some(node) = child.borrow().get_element_by_id(id) {
+                return Some(node);
+            }
+        }
+
+        None
+    }
+
     pub fn from_token_stream(token_stream: TokenStream) -> NodeRef {
         let root = Rc::new(RefCell::new(Node {
             node_type: NodeType::Document,
@@ -57,7 +86,7 @@ impl Node {
                 TokenType::OpeningTag => {
                     let new_node = Rc::new(RefCell::new(Node {
                         node_type: NodeType::Element(token.get_html_element().unwrap()),
-                        parent_element: Some(Rc::downgrade(&parent_element)),
+                        parent_element: Some(Rc::downgrade(parent_element)),
                         children: vec![],
                         properties: token.get_properties(),
                     }));
@@ -69,7 +98,7 @@ impl Node {
                 TokenType::VoidTag => {
                     let new_node = Rc::new(RefCell::new(Node {
                         node_type: NodeType::Element(token.get_html_element().unwrap()),
-                        parent_element: Some(Rc::downgrade(&parent_element)),
+                        parent_element: Some(Rc::downgrade(parent_element)),
                         children: vec![],
                         properties: HashMap::new(),
                     }));
@@ -78,7 +107,7 @@ impl Node {
                 TokenType::Text => {
                     let new_node = Rc::new(RefCell::new(Node {
                         node_type: NodeType::Text(token.get_text()),
-                        parent_element: Some(Rc::downgrade(&parent_element)),
+                        parent_element: Some(Rc::downgrade(parent_element)),
                         children: vec![],
                         properties: HashMap::new(),
                     }));
@@ -87,7 +116,7 @@ impl Node {
                 TokenType::Comment => {
                     let new_node = Rc::new(RefCell::new(Node {
                         node_type: NodeType::Comment(token.get_text()),
-                        parent_element: Some(Rc::downgrade(&parent_element)),
+                        parent_element: Some(Rc::downgrade(parent_element)),
                         children: vec![],
                         properties: token.get_properties(),
                     }));
@@ -101,16 +130,50 @@ impl Node {
 }
 
 mod tests {
+    #[cfg(test)]
     use super::*;
+    #[cfg(test)]
     use crate::tokeniser::get_tokens;
 
-    const TEST: &str =
-        "<html><head><title>Test</title></head><body><p>Hello, world!</p></body></html>";
+    #[cfg(test)]
+    const TEST: &str = r##"<html><head><title>Test</title></head><body><p id="some-paragraph">Hello, world!</p><div id='classy' class='bg-red p-10 primary'>This is a div with a few classes</div></body></html>"##;
 
     #[test]
     fn try_walk_tree() {
         let tokens = get_tokens(TEST);
         let document = Node::from_token_stream(tokens);
         document.borrow().walk_tree();
+    }
+
+    #[test]
+    fn check_element_by_id() {
+        let tokens = get_tokens(TEST);
+        let document = Node::from_token_stream(tokens);
+        let element = document
+            .borrow()
+            .get_element_by_id("some-paragraph")
+            .unwrap();
+
+        assert_eq!(element.node_type, NodeType::Element(HtmlElement::P))
+    }
+
+    #[test]
+    fn check_get_classes() {
+        let tokens = get_tokens(TEST);
+        let document = Node::from_token_stream(tokens);
+        let element = document
+            .borrow()
+            .get_element_by_id("classy")
+            .unwrap()
+            .get_class_list();
+
+        assert_eq!(
+            element,
+            vec![
+                "bg-red".to_string(),
+                "p-10".to_string(),
+                "primary".to_string()
+            ]
+        );
     }
 }
