@@ -27,6 +27,29 @@ pub struct Node {
     properties: HashMap<String, String>,
 }
 
+impl From<&Node> for String {
+    fn from(node: &Node) -> Self {
+        match &node.node_type {
+            NodeType::Text(text) => text.clone(),
+            NodeType::Element(element) => {
+                if node.properties.is_empty() {
+                    return format!("<{}>", element.tag_name());
+                }
+                let properties = node
+                    .properties
+                    .iter()
+                    .map(|(k, v)| format!("{}=\"{}\"", k, v))
+                    .collect::<Vec<String>>()
+                    .join(" ");
+                let string_repr = format!("<{} {}>", element.tag_name(), properties);
+                string_repr
+            }
+            NodeType::Document => "Document".to_string(),
+            NodeType::Comment(comment) => comment.to_string(),
+        }
+    }
+}
+
 impl Node {
     pub fn walk_tree(&self) {
         match &self.node_type {
@@ -53,6 +76,26 @@ impl Node {
             elements.extend(child.borrow().get_elements_by_class(class));
         }
         elements
+    }
+
+    pub fn get_string_repr(&self) -> String {
+        let mut html = String::new();
+        html.push_str(String::from(self).as_str());
+        for child in &self.children {
+            html.push_str(child.borrow().get_string_repr().as_str());
+        }
+        html
+    }
+
+    pub fn outer_html(&self) -> Option<String> {
+        let html = self.get_string_repr();
+        if let NodeType::Element(element) = &self.node_type {
+            if element.is_void_element() {
+                return Some(html);
+            }
+            return Some(format!("{}</{}>", html, element.tag_name()));
+        }
+        None
     }
 
     pub fn get_elements_by_tag(&self, tag: &HtmlElement) -> Vec<Node> {
@@ -97,13 +140,6 @@ impl Node {
         None
     }
 
-    // pub fn get_parent(&self) -> Option<Node> {
-    //     match self.parent_element {
-    //         Some(parent) => Some(parent.upgrade().unwrap().clone()),
-    //         None => None,
-    //     }
-    // }
-
     pub fn from_token_stream(token_stream: TokenStream) -> NodeRef {
         let root = Rc::new(RefCell::new(Node {
             node_type: NodeType::Document,
@@ -125,6 +161,7 @@ impl Node {
                         properties: token.get_properties(),
                     }));
                     parent_element.borrow_mut().children.push(new_node.clone());
+                    open_tags.push(new_node);
                 }
                 TokenType::ClosingTag => {
                     open_tags.pop();
@@ -134,7 +171,7 @@ impl Node {
                         node_type: NodeType::Element(token.get_html_element().unwrap()),
                         parent_element: Some(Rc::downgrade(parent_element)),
                         children: vec![],
-                        properties: HashMap::new(),
+                        properties: token.get_properties(),
                     }));
                     parent_element.borrow_mut().children.push(new_node.clone());
                 }
@@ -170,8 +207,8 @@ mod tests {
     use crate::tokeniser::get_tokens;
 
     #[cfg(test)]
-    const TEST: &str = r##"<html><head><title>Test</title></head><body><p id="some-paragraph">Hello, world!</p><div id='classy' class='bg-red p-10 primary'>This is a div with a few classes</div>
-    <div class='bg-red'>This is another div with the same class</div></body></html>"##;
+    const TEST: &str = r##"<html><head><title id="hmm">Test</title><br /></head><body><p id="some-paragraph">Hello, world!</p><div id='classy' class='bg-red p-10 primary'>This is a div with a few classes</div>
+    <div class='bg-red'>This is another div with the same class</div><footer>No props footer</footer><hr class="thicc"/></body></html>"##;
 
     #[test]
     fn try_walk_tree() {
@@ -228,5 +265,47 @@ mod tests {
         let elements = document.borrow().get_elements_by_tag(&HtmlElement::Div);
 
         assert_eq!(elements.len(), 2);
+    }
+
+    #[test]
+    fn check_outer_html() {
+        let tokens = get_tokens(TEST);
+        let document = Node::from_token_stream(tokens);
+        let element = document.borrow().get_element_by_id("hmm").unwrap();
+
+        assert_eq!(
+            element.outer_html().unwrap(),
+            *"<title id=\"hmm\">Test</title>"
+        );
+    }
+
+    #[test]
+    fn check_no_props_outer_html() {
+        let tokens = get_tokens(TEST);
+        let document = Node::from_token_stream(tokens);
+        let footers = document.borrow().get_elements_by_tag(&HtmlElement::Footer);
+
+        assert_eq!(
+            footers[0].outer_html().unwrap(),
+            *"<footer>No props footer</footer>"
+        );
+    }
+
+    #[test]
+    fn check_void_tag_outer_html() {
+        let tokens = get_tokens(TEST);
+        let document = Node::from_token_stream(tokens);
+        let brs = document.borrow().get_elements_by_tag(&HtmlElement::Br);
+
+        assert_eq!(brs[0].outer_html().unwrap(), *"<br>");
+    }
+
+    #[test]
+    fn check_void_tag_with_props_outer_html() {
+        let tokens = get_tokens(TEST);
+        let document = Node::from_token_stream(tokens);
+        let hrs = document.borrow().get_elements_by_tag(&HtmlElement::Hr);
+
+        assert_eq!(hrs[0].outer_html().unwrap(), *"<hr class=\"thicc\">");
     }
 }
