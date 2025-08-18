@@ -2,5 +2,8 @@
 name = "html_parser"
 version = "0.1.0"
 edition = "2024"
-
+license = "MIT OR Apache-2.0"
+description = "A basic library for tokenising HTML and generating a node tree with some basic utility functions"
+repository = "https://github.com/DoctorSulla/html_parser"
+readme = "README.md"
 [dependencies]
