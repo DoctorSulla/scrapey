@@ -78,22 +78,35 @@ impl Node {
         elements
     }
 
-    pub fn get_string_repr(&self) -> String {
+    fn get_string_repr(&self, capture: bool) -> String {
         let mut html = String::new();
-        html.push_str(String::from(self).as_str());
+        if capture {
+            html.push_str(String::from(self).as_str());
+        }
         for child in &self.children {
-            html.push_str(child.borrow().get_string_repr().as_str());
+            html.push_str(child.borrow().get_string_repr(true).as_str());
         }
         html
     }
 
     pub fn outer_html(&self) -> Option<String> {
-        let html = self.get_string_repr();
+        let html = self.get_string_repr(true);
         if let NodeType::Element(element) = &self.node_type {
             if element.is_void_element() {
                 return Some(html);
             }
             return Some(format!("{}</{}>", html, element.tag_name()));
+        }
+        None
+    }
+
+    pub fn inner_html(&self) -> Option<String> {
+        let html = self.get_string_repr(false);
+        if let NodeType::Element(element) = &self.node_type {
+            if element.is_void_element() {
+                return None;
+            }
+            return Some(html);
         }
         None
     }
@@ -280,6 +293,15 @@ mod tests {
     }
 
     #[test]
+    fn check_inner_html() {
+        let tokens = get_tokens(TEST);
+        let document = Node::from_token_stream(tokens);
+        let element = document.borrow().get_element_by_id("hmm").unwrap();
+
+        assert_eq!(element.inner_html().unwrap(), *"Test");
+    }
+
+    #[test]
     fn check_no_props_outer_html() {
         let tokens = get_tokens(TEST);
         let document = Node::from_token_stream(tokens);
@@ -289,6 +311,15 @@ mod tests {
             footers[0].outer_html().unwrap(),
             *"<footer>No props footer</footer>"
         );
+    }
+
+    #[test]
+    fn check_no_props_inner_html() {
+        let tokens = get_tokens(TEST);
+        let document = Node::from_token_stream(tokens);
+        let footers = document.borrow().get_elements_by_tag(&HtmlElement::Footer);
+
+        assert_eq!(footers[0].inner_html().unwrap(), *"No props footer");
     }
 
     #[test]
