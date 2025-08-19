@@ -38,7 +38,13 @@ impl From<&Node> for String {
                 let properties = node
                     .properties
                     .iter()
-                    .map(|(k, v)| format!("{}=\"{}\"", k, v))
+                    .map(|(k, v)| {
+                        if v.is_empty() {
+                            k.clone()
+                        } else {
+                            format!("{}=\"{}\"", k, v)
+                        }
+                    })
                     .collect::<Vec<String>>()
                     .join(" ");
                 let string_repr = format!("<{} {}>", element.tag_name(), properties);
@@ -221,6 +227,10 @@ mod tests {
 
     #[cfg(test)]
     const TEST: &str = r##"<html><head><title id="hmm">Test</title><br /></head><body><p id="some-paragraph">Hello, world!</p><div id='classy' class='bg-red p-10 primary'>This is a div with a few classes</div>
+    <div class = 'malformed'>Broken</div>
+    <div class ='malformed'>Broken</div>
+    <div class= 'malformed'>Broken</div>
+    <div class   =   'malformed'>Broken</div>
     <div class='bg-red'>This is another div with the same class</div><footer>No props footer</footer><hr class="thicc"/></body></html>"##;
 
     #[test]
@@ -277,7 +287,7 @@ mod tests {
         let document = Node::from_token_stream(tokens);
         let elements = document.borrow().get_elements_by_tag(&HtmlElement::Div);
 
-        assert_eq!(elements.len(), 2);
+        assert_eq!(elements.len(), 6);
     }
 
     #[test]
@@ -338,5 +348,53 @@ mod tests {
         let hrs = document.borrow().get_elements_by_tag(&HtmlElement::Hr);
 
         assert_eq!(hrs[0].outer_html().unwrap(), *"<hr class=\"thicc\">");
+    }
+
+    #[test]
+    fn check_malformed_tag_one() {
+        let tokens = get_tokens(TEST);
+        let document = Node::from_token_stream(tokens);
+        let divs = document.borrow().get_elements_by_tag(&HtmlElement::Div);
+
+        assert_eq!(
+            divs[1].properties.get("class").unwrap(),
+            &"malformed".to_string()
+        );
+    }
+
+    #[test]
+    fn check_malformed_tag_two() {
+        let tokens = get_tokens(TEST);
+        let document = Node::from_token_stream(tokens);
+        let divs = document.borrow().get_elements_by_tag(&HtmlElement::Div);
+
+        assert_eq!(
+            divs[2].properties.get("class").unwrap(),
+            &"malformed".to_string()
+        );
+    }
+
+    #[test]
+    fn check_malformed_tag_three() {
+        let tokens = get_tokens(TEST);
+        let document = Node::from_token_stream(tokens);
+        let divs = document.borrow().get_elements_by_tag(&HtmlElement::Div);
+
+        assert_eq!(
+            divs[3].properties.get("class").unwrap(),
+            &"malformed".to_string()
+        );
+    }
+
+    #[test]
+    fn check_malformed_tag_four() {
+        let tokens = get_tokens(TEST);
+        let document = Node::from_token_stream(tokens);
+        let divs = document.borrow().get_elements_by_tag(&HtmlElement::Div);
+
+        assert_eq!(
+            divs[4].properties.get("class").unwrap(),
+            &"malformed".to_string()
+        );
     }
 }

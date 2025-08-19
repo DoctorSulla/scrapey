@@ -126,25 +126,35 @@ fn parse_properties(properties: &str) -> HashMap<String, String> {
     let mut value_buffer = String::new();
     let mut state = AttrState::CapturingKey;
 
-    //let mut chars = properties.chars().peekable();
-    for char in properties.chars() {
+    let mut chars = properties.chars().peekable();
+    while let Some(char) = chars.next() {
         match state {
             AttrState::CapturingKey => {
                 if char == '=' {
                     state = AttrState::CapturingWrapper;
-                }
-                // This is a bool with no equals
-                else if char == ' ' {
-                    properties_map.insert(key_buffer.clone(), "true".to_string());
-                    key_buffer.clear();
-                    value_buffer.clear();
-                    state = AttrState::WhiteSpace;
+                } else if char.is_whitespace() {
+                    // Continue until we find a non-whitespace character
+                    while let Some(c) = chars.next() {
+                        if !c.is_whitespace() {
+                            if c == '=' {
+                                state = AttrState::CapturingWrapper;
+                            } else {
+                                properties_map.insert(key_buffer.clone(), "".to_string());
+                                key_buffer.clear();
+                                value_buffer.clear();
+                                state = AttrState::WhiteSpace;
+                            }
+                            break;
+                        }
+                    }
                 } else {
                     key_buffer.push(char);
                 }
             }
             AttrState::CapturingWrapper => {
-                if char == '\'' {
+                if char == ' ' {
+                    continue;
+                } else if char == '\'' {
                     wrapper = Some('\'');
                 } else if char == '"' {
                     wrapper = Some('"');
@@ -188,7 +198,7 @@ fn parse_properties(properties: &str) -> HashMap<String, String> {
             properties_map.insert(key_buffer.clone(), value_buffer.clone());
         } else {
             // Boolean attribute
-            properties_map.insert(key_buffer.clone(), "true".to_string());
+            properties_map.insert(key_buffer.clone(), "".to_string());
         }
     }
 
@@ -358,9 +368,6 @@ mod tests {
     #[test]
     fn check_bool_property() {
         let response = get_tokens(BASIC_HTML_DOCUMENT);
-        assert_eq!(
-            response[9].properties.get("required").unwrap(),
-            &"true".to_string()
-        );
+        assert!(response[9].properties.get("required").unwrap().is_empty());
     }
 }
