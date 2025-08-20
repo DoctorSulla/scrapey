@@ -22,7 +22,7 @@ pub enum NodeType {
 #[derive(Clone, Debug)]
 pub struct Node {
     node_type: NodeType,
-    parent_element: Option<Weak<RefCell<Node>>>,
+    _parent_element: Option<Weak<RefCell<Node>>>,
     children: Vec<NodeRef>,
     properties: HashMap<String, String>,
 }
@@ -72,10 +72,10 @@ impl Node {
 
     pub fn get_elements_by_class(&self, class: &str) -> Vec<Node> {
         let mut elements = Vec::new();
-        if let NodeType::Element(_element) = &self.node_type {
-            if self.get_class_list().contains(&class.to_string()) {
-                elements.push(self.clone());
-            }
+        if let NodeType::Element(_element) = &self.node_type
+            && self.get_class_list().contains(&class.to_string())
+        {
+            elements.push(self.clone());
         }
 
         for child in &self.children {
@@ -84,46 +84,43 @@ impl Node {
         elements
     }
 
-    fn get_string_repr(&self, capture: bool) -> String {
+    pub fn outer_html(&self) -> String {
         let mut html = String::new();
-        if capture {
-            html.push_str(String::from(self).as_str());
-        }
+        // Add opening tag
+        html.push_str(String::from(self).as_str());
+        // Add children recursively
         for child in &self.children {
-            html.push_str(child.borrow().get_string_repr(true).as_str());
+            html.push_str(child.borrow().outer_html().as_str());
+        }
+        // Add closing tag if not void
+        if let NodeType::Element(e) = &self.node_type {
+            if e.is_void_element() {
+                return html;
+            }
+            html.push_str("</");
+            html.push_str(e.tag_name());
+            html.push('>');
         }
         html
     }
 
-    pub fn outer_html(&self) -> Option<String> {
-        let html = self.get_string_repr(true);
-        if let NodeType::Element(element) = &self.node_type {
-            if element.is_void_element() {
-                return Some(html);
-            }
-            return Some(format!("{}</{}>", html, element.tag_name()));
+    pub fn inner_html(&self) -> String {
+        let mut html = String::new();
+        // Add children recursively
+        for child in &self.children {
+            html.push_str(child.borrow().outer_html().as_str());
         }
-        None
-    }
-
-    pub fn inner_html(&self) -> Option<String> {
-        let html = self.get_string_repr(false);
-        if let NodeType::Element(element) = &self.node_type {
-            if element.is_void_element() {
-                return None;
-            }
-            return Some(html);
-        }
-        None
+        html
     }
 
     pub fn get_elements_by_tag(&self, tag: &HtmlElement) -> Vec<Node> {
         let mut elements = Vec::new();
-        if let NodeType::Element(element) = &self.node_type {
-            if element == tag {
-                elements.push(self.clone());
-            }
+        if let NodeType::Element(element) = &self.node_type
+            && element == tag
+        {
+            elements.push(self.clone());
         }
+
         for child in &self.children {
             elements.extend(child.borrow().get_elements_by_tag(tag));
         }
@@ -162,7 +159,7 @@ impl Node {
     pub fn from_token_stream(token_stream: TokenStream) -> NodeRef {
         let root = Rc::new(RefCell::new(Node {
             node_type: NodeType::Document,
-            parent_element: None,
+            _parent_element: None,
             children: vec![],
             properties: HashMap::new(),
         }));
@@ -175,7 +172,7 @@ impl Node {
                 TokenType::OpeningTag => {
                     let new_node = Rc::new(RefCell::new(Node {
                         node_type: NodeType::Element(token.get_html_element().unwrap()),
-                        parent_element: Some(Rc::downgrade(parent_element)),
+                        _parent_element: Some(Rc::downgrade(parent_element)),
                         children: vec![],
                         properties: token.get_properties(),
                     }));
@@ -188,7 +185,7 @@ impl Node {
                 TokenType::VoidTag => {
                     let new_node = Rc::new(RefCell::new(Node {
                         node_type: NodeType::Element(token.get_html_element().unwrap()),
-                        parent_element: Some(Rc::downgrade(parent_element)),
+                        _parent_element: Some(Rc::downgrade(parent_element)),
                         children: vec![],
                         properties: token.get_properties(),
                     }));
@@ -197,7 +194,7 @@ impl Node {
                 TokenType::Text => {
                     let new_node = Rc::new(RefCell::new(Node {
                         node_type: NodeType::Text(token.get_text()),
-                        parent_element: Some(Rc::downgrade(parent_element)),
+                        _parent_element: Some(Rc::downgrade(parent_element)),
                         children: vec![],
                         properties: HashMap::new(),
                     }));
@@ -206,7 +203,7 @@ impl Node {
                 TokenType::Comment => {
                     let new_node = Rc::new(RefCell::new(Node {
                         node_type: NodeType::Comment(token.get_text()),
-                        parent_element: Some(Rc::downgrade(parent_element)),
+                        _parent_element: Some(Rc::downgrade(parent_element)),
                         children: vec![],
                         properties: token.get_properties(),
                     }));
@@ -231,6 +228,7 @@ mod tests {
     <div class ='malformed'>Broken</div>
     <div class= 'malformed'>Broken</div>
     <div class   =   'malformed'>Broken</div>
+    <div id='nested'><p>Some text inside</p></div>
     <div class='bg-red'>This is another div with the same class</div><footer>No props footer</footer><hr class="thicc"/></body></html>"##;
 
     #[test]
@@ -287,7 +285,7 @@ mod tests {
         let document = Node::from_token_stream(tokens);
         let elements = document.borrow().get_elements_by_tag(&HtmlElement::Div);
 
-        assert_eq!(elements.len(), 6);
+        assert_eq!(elements.len(), 7);
     }
 
     #[test]
@@ -296,10 +294,7 @@ mod tests {
         let document = Node::from_token_stream(tokens);
         let element = document.borrow().get_element_by_id("hmm").unwrap();
 
-        assert_eq!(
-            element.outer_html().unwrap(),
-            *"<title id=\"hmm\">Test</title>"
-        );
+        assert_eq!(element.outer_html(), *"<title id=\"hmm\">Test</title>");
     }
 
     #[test]
@@ -308,7 +303,28 @@ mod tests {
         let document = Node::from_token_stream(tokens);
         let element = document.borrow().get_element_by_id("hmm").unwrap();
 
-        assert_eq!(element.inner_html().unwrap(), *"Test");
+        assert_eq!(element.inner_html(), *"Test");
+    }
+
+    #[test]
+    fn check_nested_inner_html() {
+        let tokens = get_tokens(TEST);
+        let document = Node::from_token_stream(tokens);
+        let element = document.borrow().get_element_by_id("nested").unwrap();
+
+        assert_eq!(element.inner_html(), *"<p>Some text inside</p>");
+    }
+
+    #[test]
+    fn check_nested_outer_html() {
+        let tokens = get_tokens(TEST);
+        let document = Node::from_token_stream(tokens);
+        let element = document.borrow().get_element_by_id("nested").unwrap();
+
+        assert_eq!(
+            element.outer_html(),
+            *"<div id=\"nested\"><p>Some text inside</p></div>"
+        );
     }
 
     #[test]
@@ -317,10 +333,7 @@ mod tests {
         let document = Node::from_token_stream(tokens);
         let footers = document.borrow().get_elements_by_tag(&HtmlElement::Footer);
 
-        assert_eq!(
-            footers[0].outer_html().unwrap(),
-            *"<footer>No props footer</footer>"
-        );
+        assert_eq!(footers[0].outer_html(), *"<footer>No props footer</footer>");
     }
 
     #[test]
@@ -329,7 +342,7 @@ mod tests {
         let document = Node::from_token_stream(tokens);
         let footers = document.borrow().get_elements_by_tag(&HtmlElement::Footer);
 
-        assert_eq!(footers[0].inner_html().unwrap(), *"No props footer");
+        assert_eq!(footers[0].inner_html(), *"No props footer");
     }
 
     #[test]
@@ -338,7 +351,7 @@ mod tests {
         let document = Node::from_token_stream(tokens);
         let brs = document.borrow().get_elements_by_tag(&HtmlElement::Br);
 
-        assert_eq!(brs[0].outer_html().unwrap(), *"<br>");
+        assert_eq!(brs[0].outer_html(), *"<br>");
     }
 
     #[test]
@@ -347,7 +360,7 @@ mod tests {
         let document = Node::from_token_stream(tokens);
         let hrs = document.borrow().get_elements_by_tag(&HtmlElement::Hr);
 
-        assert_eq!(hrs[0].outer_html().unwrap(), *"<hr class=\"thicc\">");
+        assert_eq!(hrs[0].outer_html(), *"<hr class=\"thicc\">");
     }
 
     #[test]

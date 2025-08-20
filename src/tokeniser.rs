@@ -134,7 +134,7 @@ fn parse_properties(properties: &str) -> HashMap<String, String> {
                     state = AttrState::CapturingWrapper;
                 } else if char.is_whitespace() {
                     // Continue until we find a non-whitespace character
-                    while let Some(c) = chars.next() {
+                    for c in chars.by_ref() {
                         if !c.is_whitespace() {
                             if c == '=' {
                                 state = AttrState::CapturingWrapper;
