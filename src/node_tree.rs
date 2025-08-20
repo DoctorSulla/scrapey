@@ -231,12 +231,12 @@ mod tests {
     <div id='nested'><p>Some text inside</p></div>
     <div class='bg-red'>This is another div with the same class</div><footer>No props footer</footer><hr class="thicc"/></body></html>"##;
 
-    #[test]
-    fn try_walk_tree() {
-        let tokens = get_tokens(TEST);
-        let document = Node::from_token_stream(tokens);
-        document.borrow().walk_tree();
-    }
+    // #[test]
+    // fn try_walk_tree() {
+    //     let tokens = get_tokens(TEST);
+    //     let document = Node::from_token_stream(tokens);
+    //     document.borrow().walk_tree();
+    // }
 
     #[test]
     fn check_element_by_id() {

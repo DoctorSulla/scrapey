@@ -181,6 +181,8 @@ fn parse_properties(properties: &str) -> HashMap<String, String> {
                         key_buffer.clear();
                         value_buffer.clear();
                         state = AttrState::WhiteSpace;
+                    } else {
+                        value_buffer.push(char);
                     }
                 }
             },
@@ -305,6 +307,7 @@ mod tests {
     </head>
     <body>
     <img src="random.jpg" height="400" width="300" />
+    <a href=i/dont/quote/my/urls.php>Broken Link</a>
     <input type="text" name="random-input" required />
     <nav class="top-nav">
     <div class="nav-item"><a class="nav-link" href="https://random.com/home">Home</a></div>
@@ -368,6 +371,17 @@ mod tests {
     #[test]
     fn check_bool_property() {
         let response = get_tokens(BASIC_HTML_DOCUMENT);
-        assert!(response[9].properties.get("required").unwrap().is_empty());
+        assert!(response[12].properties.get("required").unwrap().is_empty());
+    }
+
+    #[test]
+    fn check_malformed_url() {
+        let response = get_tokens(BASIC_HTML_DOCUMENT);
+
+        println!("{:?}", response[9]);
+        assert_eq!(
+            response[9].properties.get("href").unwrap(),
+            &"i/dont/quote/my/urls.php".to_string()
+        );
     }
 }
