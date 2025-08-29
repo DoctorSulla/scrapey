@@ -57,6 +57,10 @@ impl From<&Node> for String {
 }
 
 impl Node {
+    pub fn get_children(&self) -> Vec<NodeRef> {
+        self.children.clone()
+    }
+
     pub fn walk_tree(&self) {
         match &self.node_type {
             NodeType::Document => println!("Document"),
@@ -229,7 +233,13 @@ mod tests {
     <div class= 'malformed'>Broken</div>
     <div class   =   'malformed'>Broken</div>
     <div id='nested'><p>Some text inside</p></div>
-    <div class='bg-red'>This is another div with the same class</div><footer>No props footer</footer><hr class="thicc"/></body></html>"##;
+    <div class='bg-red'>This is another div with the same class</div><footer>No props footer</footer><hr class="thicc"/>
+    <ul id="some-list">
+        <li>Item 1</li>
+        <li>Item 2</li>
+        <li>Item 3</li>
+    </ul>
+    </body></html>"##;
 
     // #[test]
     // fn try_walk_tree() {
@@ -237,6 +247,26 @@ mod tests {
     //     let document = Node::from_token_stream(tokens);
     //     document.borrow().walk_tree();
     // }
+
+    #[test]
+    fn check_children_and_inner_html() {
+        let tokens = get_tokens(TEST);
+        let document = Node::from_token_stream(tokens);
+        let element = document.borrow().get_element_by_id("some-list").unwrap();
+        let children = element.get_children();
+
+        assert_eq!(children[0].borrow().inner_html(), "Item 1");
+    }
+
+    #[test]
+    fn check_children() {
+        let tokens = get_tokens(TEST);
+        let document = Node::from_token_stream(tokens);
+        let element = document.borrow().get_element_by_id("some-list").unwrap();
+        let children = element.get_children();
+
+        assert_eq!(children.len(), 3);
+    }
 
     #[test]
     fn check_element_by_id() {
