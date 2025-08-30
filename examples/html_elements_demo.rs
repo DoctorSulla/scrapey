@@ -1,4 +1,4 @@
-use html_parser::html_elements::HtmlElement;
+use scrapey::html_elements::HtmlElement;
 
 fn main() {
     // Example 1: Creating elements from tag names
