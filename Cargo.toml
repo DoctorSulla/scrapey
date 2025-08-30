@@ -6,4 +6,5 @@ license = "MIT OR Apache-2.0"
 description = "A basic library for tokenising HTML and generating a node tree with some basic utility functions"
 repository = "https://github.com/DoctorSulla/scrapey"
 readme = "README.md"
+keywords = ["parser","tokeniser","html"]
 [dependencies]
