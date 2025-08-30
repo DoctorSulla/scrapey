@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "html_parser"
+name = "scrapey"
 version = "0.1.0"
