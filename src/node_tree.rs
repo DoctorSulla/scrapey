@@ -117,6 +117,19 @@ impl Node {
         html
     }
 
+    pub fn inner_text(&self) -> String {
+        let mut inner_text = String::new();
+        for child in &self.children {
+            inner_text.push_str(child.borrow().inner_text().as_str());
+        }
+
+        if let NodeType::Text(value) = &self.node_type {
+            return value.to_string();
+        }
+
+        inner_text
+    }
+
     pub fn get_elements_by_tag(&self, tag: &HtmlElement) -> Vec<Node> {
         let mut elements = Vec::new();
         if let NodeType::Element(element) = &self.node_type
@@ -240,6 +253,9 @@ mod tests {
         <li>Item 3</li>
     </ul>
     </body></html>"##;
+
+    #[cfg(test)]
+    const INNER_TEXT_EXAMPLE: &str = r##"<div><a href="https://google.com"><span>The quick brown <b>fox</b> jumped over the lazy dog</span></a></div>"##;
 
     // #[test]
     // fn try_walk_tree() {
@@ -438,6 +454,18 @@ mod tests {
         assert_eq!(
             divs[4].properties.get("class").unwrap(),
             &"malformed".to_string()
+        );
+    }
+
+    #[test]
+    fn check_inner_text() {
+        let tokens = get_tokens(INNER_TEXT_EXAMPLE);
+        let document = Node::from_token_stream(tokens);
+        let divs = document.borrow().get_elements_by_tag(&HtmlElement::Div);
+
+        assert_eq!(
+            divs[0].inner_text(),
+            "The quick brown fox jumped over the lazy dog".to_string()
         );
     }
 }
